@@ -12,5 +12,6 @@ public enum StockReferenceType {
     CUSTOMER_RETURN,
     SUPPLIER_RETURN,
     MANUAL_ADJUSTMENT,
-    SALE_VOID
+    SALE_VOID,
+    WAREHOUSE_ENTRY
 }

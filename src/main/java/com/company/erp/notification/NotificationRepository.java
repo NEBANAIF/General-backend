@@ -11,6 +11,8 @@ import java.util.UUID;
 
 public interface NotificationRepository extends JpaRepository<Notification, UUID> {
 
+    java.util.List<Notification> findByReferenceTypeAndReferenceId(String referenceType, UUID referenceId);
+
     /** Not yet read by this user, for the given branches, newest first. */
     @Query(value = """
             SELECT n FROM Notification n

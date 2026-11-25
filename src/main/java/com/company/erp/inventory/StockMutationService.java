@@ -203,7 +203,8 @@ public class StockMutationService {
             throw new IllegalStateException(
                     "Stock history reconciliation mismatch for product " + product.getId());
         }
-        notificationService.recordStockChange(product, branch, -quantity, movementType, reason, user);
+        notificationService.recordStockChange(product, branch, -quantity, movementType, reason, user,
+                referenceType != null ? referenceType.name() : null, referenceId);
 
         return consumptions;
     }

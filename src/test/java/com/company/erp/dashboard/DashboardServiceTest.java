@@ -4,7 +4,12 @@ import com.company.erp.batch.ProductBatchRepository;
 import com.company.erp.expense.ExpenseRepository;
 import com.company.erp.finance.FinanceReportService;
 import com.company.erp.finance.dto.BranchPnLResponse;
-import com.company.erp.inventory.InventoryRepository;
+import com.company.erp.branch.BranchRepository;
+import com.company.erp.inventory.ProductStockService;
+import com.company.erp.inventory.StockStatus;
+import com.company.erp.inventory.dto.StockAttentionRow;
+import com.company.erp.inventory.dto.StockStatusReportResponse;
+import com.company.erp.inventory.dto.StockSummaryResponse;
 import com.company.erp.report.ReportService;
 import com.company.erp.sales.Sale;
 import com.company.erp.sales.SaleRepository;
@@ -38,7 +43,8 @@ class DashboardServiceTest {
     @Mock private SaleRepository saleRepository;
     @Mock private StockTransferRepository stockTransferRepository;
     @Mock private ExpenseRepository expenseRepository;
-    @Mock private InventoryRepository inventoryRepository;
+    @Mock private ProductStockService productStockService;
+    @Mock private BranchRepository branchRepository;
     @Mock private ProductBatchRepository productBatchRepository;
 
     private DashboardService service;
@@ -50,17 +56,15 @@ class DashboardServiceTest {
     @BeforeEach
     void setUp() {
         service = new DashboardService(financeReportService, reportService, branchAccessService, saleRepository,
-                stockTransferRepository, expenseRepository, inventoryRepository, productBatchRepository);
+                stockTransferRepository, expenseRepository, productStockService, branchRepository, productBatchRepository);
 
         lenient().when(branchAccessService.resolveReadableBranchIds(any(), any())).thenReturn(List.of(branchId));
         lenient().when(financeReportService.getPnL(any(), any(), any(), any())).thenReturn(
                 new BranchPnLResponse(from, to, BigDecimal.valueOf(3000), BigDecimal.valueOf(2200),
                         BigDecimal.valueOf(800), BigDecimal.valueOf(100), BigDecimal.valueOf(700), BigDecimal.valueOf(23.33)));
         lenient().when(productBatchRepository.sumInventoryValueForBranches(any())).thenReturn(BigDecimal.valueOf(67000));
-        lenient().when(inventoryRepository.countLowStock(any())).thenReturn(3L);
-        lenient().when(inventoryRepository.countOutOfStock(any())).thenReturn(1L);
-        lenient().when(inventoryRepository.countInStock(any())).thenReturn(40L);
-        lenient().when(inventoryRepository.findLowStockAlerts(any(), any())).thenReturn(List.of());
+        lenient().when(productStockService.report(any(), any())).thenReturn(
+                new StockStatusReportResponse(new StockSummaryResponse(44, 40, 3, 1), List.of()));
         Page<Sale> emptySales = new PageImpl<>(List.of());
         lenient().when(saleRepository.search(any(), any(), any(), any(), any(), any(), any(), any())).thenReturn(emptySales);
         Page<StockTransfer> emptyTransfers = new PageImpl<>(List.of());
@@ -84,11 +88,28 @@ class DashboardServiceTest {
     }
 
     @Test
+    void neverStockedProductsCountAsOutOfStockAndAppearInTheAlerts() {
+        // A product that was created but never received any stock has NO inventory row. It must still be
+        // out of stock on the dashboard (the old row-counting query reported 0 for exactly this case).
+        UUID productId = UUID.randomUUID();
+        when(productStockService.report(any(), any())).thenReturn(new StockStatusReportResponse(
+                new StockSummaryResponse(5, 2, 1, 2),
+                List.of(new StockAttentionRow(productId, "Pro 5s Earphone", "PRO5S", "pcs", 0, 10, StockStatus.OUT_OF_STOCK))));
+
+        var result = service.getSummary(BranchAccessService.BranchScope.ALL, null, from, to);
+
+        assertThat(result.outOfStockCount()).isEqualTo(2L);
+        assertThat(result.lowStockAlerts()).hasSize(1);
+        assertThat(result.lowStockAlerts().get(0).productName()).isEqualTo("Pro 5s Earphone");
+        assertThat(result.lowStockAlerts().get(0).availableQuantity()).isZero();
+        assertThat(result.lowStockAlerts().get(0).branchName()).isEqualTo("All branches");
+    }
+
+    @Test
     void lowStockAndOutOfStockAreDistinctCounts() {
         var result = service.getSummary(BranchAccessService.BranchScope.ALL, null, from, to);
 
-        // These must come from two DIFFERENT repository methods, not one
-        // count split client-side - confirms no double-counting/overlap.
+        // low and out are separate buckets of the same per-product report - no overlap.
         assertThat(result.lowStockCount()).isNotEqualTo(result.outOfStockCount());
     }
 }

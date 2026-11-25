@@ -167,6 +167,15 @@ Payment Method must be Cash or Bank (or left blank for Cash)	የክፍያ ዘዴ
 Choose the bank used for Bank payments on the import screen	በማስመጫ ማያ ገጹ ላይ ለባንክ ክፍያዎች የሚውለውን ባንክ ይምረጡ
 Row {1}: {2}	ረድፍ {1}፦ {2}
 Unexpected error: {1}	ያልተጠበቀ ስህተት፦ {1}
+That product is not available at this warehouse	ይህ ምርት በዚህ መጋዘን አይገኝም
+Choose a warehouse first	መጀመሪያ መጋዘን ይምረጡ
+Only stock that was given out can be settled into sales	ወደ ሽያጭ ሊጠናቀቅ የሚችለው የተሰጠ ክምችት ብቻ ነው
+Only {1} units of this entry are left to settle, but {2} were entered	በዚህ መዝገብ ለማጠናቀቅ {1} መለኪያዎች ብቻ ቀርተዋል፣ ነገር ግን {2} ገብተዋል
+Not enough given-out stock is left on this entry	በዚህ መዝገብ ላይ በቂ የተሰጠ ክምችት አልቀረም
+Warehouse entry	የመጋዘን መዝገብ
+WAREHOUSE_LOG	የመጋዘን መዝገብ
+WAREHOUSE_SETTLE	የመጋዘን ማጠናቀቅ
+The Warehouse page is only for warehouse branches	የመጋዘን ገጹ ለመጋዘን ቅርንጫፎች ብቻ ነው
 One or more fields are invalid	አንድ ወይም ከዚያ በላይ መስኮች ልክ አይደሉም
 You do not have permission to perform this action	ይህን ድርጊት የማከናወን ፈቃድ የለዎትም
 Invalid email or password	ኢሜይል ወይም የይለፍ ቃል ልክ አይደለም

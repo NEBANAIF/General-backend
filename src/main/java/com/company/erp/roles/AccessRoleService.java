@@ -100,8 +100,10 @@ public class AccessRoleService {
         requireSuperAdmin();
 
         AccessRole role = findOrThrow(id);
-        if (role.isSystemRole()) {
-            throw new BusinessRuleViolationException("The built-in roles cannot be deleted");
+        // Only the Super Admin role is permanent. The other built-in roles (Store Manager, Store Staff, ...) are ordinary
+        // starting points: delete the ones you do not want and create your own.
+        if (role.isSystemRole() && role.getBaseRole() == Role.SUPER_ADMIN) {
+            throw new BusinessRuleViolationException("The Super Admin role cannot be deleted");
         }
         long users = userRepository.countByAccessRoleId(id);
         if (users > 0) {

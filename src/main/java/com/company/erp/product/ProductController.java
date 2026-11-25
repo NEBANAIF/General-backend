@@ -35,7 +35,8 @@ public class ProductController {
 
     // Also the product picker (filter) on the Batches and Stock History pages.
     @GetMapping
-    @PreAuthorize("hasAnyAuthority('INVENTORY_VIEW', 'BATCH_VIEW', 'STOCK_HISTORY_VIEW')")
+    @PreAuthorize("hasAnyAuthority('PRODUCT_VIEW', 'INVENTORY_VIEW', 'BATCH_VIEW', 'STOCK_HISTORY_VIEW', "
+            + "'POS_ACCESS', 'PURCHASE_CREATE', 'TRANSFER_CREATE', 'BATCH_CREATE', 'STOCK_ADJUST')")
     public PageResponse<ProductResponse> search(
             @RequestParam(defaultValue = "true") boolean activeOnly,
             @RequestParam(required = false) String search,
@@ -58,7 +59,7 @@ public class ProductController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAuthority('INVENTORY_VIEW')")
+    @PreAuthorize("hasAnyAuthority('PRODUCT_VIEW', 'INVENTORY_VIEW')")
     public ProductResponse get(@PathVariable UUID id) {
         return productService.get(id);
     }

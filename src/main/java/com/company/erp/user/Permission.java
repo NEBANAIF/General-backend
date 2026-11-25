@@ -52,6 +52,9 @@ public enum Permission {
             "Take back goods from a customer."),
     SALES_VOID("Sales", "Void a sale",
             "Cancel a wrong or duplicate sale entirely and reverse its stock/financial impact. Blocked once any loan payment has been recorded against it."),
+    PRODUCT_VIEW("Inventory", "View products",
+            "See the list of products (name, SKU, unit and whether it is in stock) and pick products in the POS, "
+                    + "Purchases, Transfers and other forms. Does not open Batches or Stock History."),
     INVENTORY_VIEW("Inventory", "View inventory",
             "Open the Inventory page: products and stock levels."),
     BATCH_VIEW("Inventory", "View batches",
@@ -66,6 +69,12 @@ public enum Permission {
             "Change product details."),
     PRODUCT_DELETE("Inventory", "Delete products",
             "Remove (hide) products."),
+    WAREHOUSE_LOG("Warehouse", "Record stock received and given out",
+            "Open the Warehouse page and record how many units were received and how many were given out. "
+                    + "Shows quantities only - no prices, costs or customers."),
+    WAREHOUSE_SETTLE("Warehouse", "Settle given-out stock into sales",
+            "Turn stock the warehouse gave out into sales: choose the customer, price and payment for each part "
+                    + "(a part can be paid, partly paid or on loan). Needs prices and customers, so keep it for managers."),
     STOCK_ADJUST("Inventory", "Adjust stock",
             "Manually increase or decrease stock."),
     BATCH_CREATE("Inventory", "Add batches",

@@ -10,6 +10,7 @@ com\company\erp\expense\ExpenseServiceTest.class
 com\company\erp\finance\FinanceReportServiceTest.class
 com\company\erp\loan\LoanServiceTest.class
 com\company\erp\security\UserPrincipalPermissionsTest.class
+com\company\erp\warehouse\WarehouseSettlementServiceTest.class
 com\company\erp\purchase\PurchaseOrderServiceTest.class
 com\company\erp\purchase\RouteValidatorTest.class
 com\company\erp\bank\BankServiceTest.class

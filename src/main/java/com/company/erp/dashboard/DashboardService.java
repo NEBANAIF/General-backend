@@ -1,12 +1,14 @@
 package com.company.erp.dashboard;
 
 import com.company.erp.batch.ProductBatchRepository;
+import com.company.erp.branch.BranchRepository;
 import com.company.erp.dashboard.dto.DashboardSummaryResponse;
 import com.company.erp.dashboard.dto.LowStockAlertResponse;
 import com.company.erp.expense.ExpenseRepository;
 import com.company.erp.expense.dto.ExpenseResponse;
 import com.company.erp.finance.FinanceReportService;
-import com.company.erp.inventory.InventoryRepository;
+import com.company.erp.inventory.ProductStockService;
+import com.company.erp.inventory.dto.StockStatusReportResponse;
 import com.company.erp.report.ReportService;
 import com.company.erp.sales.SaleRepository;
 import com.company.erp.sales.SaleStatus;
@@ -46,7 +48,8 @@ public class DashboardService {
     private final SaleRepository saleRepository;
     private final StockTransferRepository stockTransferRepository;
     private final ExpenseRepository expenseRepository;
-    private final InventoryRepository inventoryRepository;
+    private final ProductStockService productStockService;
+    private final BranchRepository branchRepository;
     private final ProductBatchRepository productBatchRepository;
 
     @Transactional(readOnly = true)
@@ -66,12 +69,20 @@ public class DashboardService {
         // to [from, to] - "how much stock is on hand right now" doesn't
         // have a date range, unlike the P&L figures above it.
         var inventoryValue = productBatchRepository.sumInventoryValueForBranches(branchIds);
-        long lowStockCount = inventoryRepository.countLowStock(branchIds);
-        long outOfStockCount = inventoryRepository.countOutOfStock(branchIds);
-        long inStockCount = inventoryRepository.countInStock(branchIds);
-        List<LowStockAlertResponse> lowStockAlerts = inventoryRepository
-                .findLowStockAlerts(branchIds, PageRequest.of(0, LOW_STOCK_ALERT_LIMIT))
-                .stream().map(LowStockAlertResponse::from).toList();
+        //
+        // Stock status is counted PER PRODUCT over the selected branches - the same figures as the Reports page and
+        // the Products page's "Out of stock" filter. A product that has never been stocked has no inventory row at
+        // all, and counts as out of stock (0 available); counting stock rows alone missed exactly those products.
+        StockStatusReportResponse stock = productStockService.report(scope, specificBranchId);
+        long lowStockCount = stock.summary().lowStock();
+        long outOfStockCount = stock.summary().outOfStock();
+        long inStockCount = stock.summary().inStock();
+        String stockScopeLabel = stockScopeLabel(branchIds);
+        List<LowStockAlertResponse> lowStockAlerts = stock.needsAttention().stream()
+                .limit(LOW_STOCK_ALERT_LIMIT)
+                .map(r -> new LowStockAlertResponse(r.productId(), r.productName(), r.sku(), null,
+                        stockScopeLabel, r.available(), r.reorderLevel()))
+                .toList();
 
         List<SaleSummaryResponse> recentSales = saleRepository
                 .search(branchIds, null, null, null, null, null, null, PageRequest.of(0, RECENT_ACTIVITY_LIMIT))
@@ -89,5 +100,13 @@ public class DashboardService {
                 pnl.totalExpenses(), pnl.netProfit(), pnl.profitMarginPercent(), inventoryValue,
                 lowStockCount, outOfStockCount, inStockCount, recentSales, recentTransfers, recentExpenses,
                 lowStockAlerts, branchPerformance);
+    }
+
+    /** "Bole Store" when exactly one branch is in view, otherwise "All branches" (quantities are summed across them). */
+    private String stockScopeLabel(List<UUID> branchIds) {
+        if (branchIds.size() == 1) {
+            return branchRepository.findById(branchIds.get(0)).map(b -> b.getName()).orElse("All branches");
+        }
+        return "All branches";
     }
 }

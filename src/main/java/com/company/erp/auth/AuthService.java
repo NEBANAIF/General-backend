@@ -15,10 +15,13 @@ import com.company.erp.user.dto.UserResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.http.HttpStatus;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -33,6 +36,10 @@ public class AuthService {
     private final UserRepository userRepository;
     private final UserService userService;
 
+    /** From ERP_SETUP_KEY. Empty means first-admin setup is switched off. */
+    @Value("${erp.setup-key:}")
+    private String setupKey;
+
     /**
      * Creates the very first Super Admin from credentials supplied in the
      * request body - never from source. Only works while the users table
@@ -40,10 +47,21 @@ public class AuthService {
      * made) it refuses, so it's a true one-time bootstrap, not a standing
      * open registration endpoint.
      */
-    public UserResponse bootstrapAdmin(BootstrapAdminRequest request) {
-        if (userRepository.count() > 0) {
+    public UserResponse bootstrapAdmin(BootstrapAdminRequest request, String providedKey) {
+        if (setupKey == null || setupKey.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "First-admin setup is switched off: set ERP_SETUP_KEY on the server to enable it.");
+        }
+        boolean keyMatches = providedKey != null && MessageDigest.isEqual(
+                setupKey.getBytes(StandardCharsets.UTF_8), providedKey.getBytes(StandardCharsets.UTF_8));
+        if (!keyMatches) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Wrong or missing setup key.");
+        }
+        // Allowed only while there is NO ACTIVE Super Admin (a brand-new database, or recovery after the old admin was
+        // switched off). As soon as one active Super Admin exists it refuses, so it can never add a second one.
+        if (userRepository.countByRoleAndActiveTrue(Role.SUPER_ADMIN) > 0) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
-                    "An admin already exists - use POST /api/users (as an authenticated Super Admin) to add more users.");
+                    "An active Super Admin already exists - use POST /api/users (as an authenticated Super Admin) to add more users.");
         }
         return userService.createUser(new CreateUserRequest(
                 request.name(), request.email(), null, request.password(), Role.SUPER_ADMIN, null, null));

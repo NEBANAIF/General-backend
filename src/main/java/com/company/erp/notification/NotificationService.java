@@ -41,6 +41,9 @@ public class NotificationService {
     /** referenceType of the notification that announces a held manual stock change. */
     public static final String STOCK_CHANGE_REQUEST = "STOCK_CHANGE_REQUEST";
 
+    /** referenceType of a "warehouse gave out stock" notification: its referenceId is the warehouse entry to settle. */
+    public static final String WAREHOUSE_ENTRY = "WAREHOUSE_ENTRY";
+
     private static final int MESSAGE_MAX = 500;
 
     private final NotificationRepository notificationRepository;
@@ -80,6 +83,16 @@ public class NotificationService {
     @Transactional
     public void recordStockChange(Product product, Branch branch, int quantity, StockMovementType movementType,
                                   String reason, User actor) {
+        recordStockChange(product, branch, quantity, movementType, reason, actor, null, null);
+    }
+
+    /**
+     * Same, and remembers what the change belongs to. Only a warehouse give-out keeps its reference: that is what lets
+     * the notification's button open the settle step for exactly that entry.
+     */
+    @Transactional
+    public void recordStockChange(Product product, Branch branch, int quantity, StockMovementType movementType,
+                                  String reason, User actor, String referenceType, UUID referenceId) {
         if (movementType == StockMovementType.SALE || movementType == StockMovementType.SALE_VOID) {
             return;
         }
@@ -93,7 +106,21 @@ public class NotificationService {
         String message = product.getName() + ": " + (quantity > 0 ? "+" : "") + quantity + unit
                 + " at " + branch.getName()
                 + (reason == null || reason.isBlank() ? "" : " — " + reason.trim());
-        record(NotificationType.STOCK_CHANGE, stockTitle(movementType), message, branch, actor, null, null);
+        boolean linked = movementType == StockMovementType.WAREHOUSE_ISSUE;
+        record(NotificationType.STOCK_CHANGE, stockTitle(movementType), message, branch, actor,
+                linked ? referenceType : null, linked ? referenceId : null);
+    }
+
+    /** The give-out was fully settled into sales: its notification no longer needs anybody's review. */
+    @Transactional
+    public void approveByReference(String referenceType, UUID referenceId, User by) {
+        for (Notification n : notificationRepository.findByReferenceTypeAndReferenceId(referenceType, referenceId)) {
+            if (n.getReviewStatus() != ReviewStatus.APPROVED) {
+                n.setReviewStatus(ReviewStatus.APPROVED);
+                n.setReviewedBy(by);
+                n.setReviewedAt(Instant.now());
+            }
+        }
     }
 
     private static String stockTitle(StockMovementType type) {
@@ -103,6 +130,8 @@ public class NotificationService {
             case TRANSFER_IN -> "Transfer received";
             case CUSTOMER_RETURN -> "Customer return restocked";
             case SUPPLIER_RETURN -> "Returned to supplier";
+            case WAREHOUSE_RECEIPT -> "Warehouse received stock";
+            case WAREHOUSE_ISSUE -> "Warehouse gave out stock";
             default -> "Stock changed";
         };
     }

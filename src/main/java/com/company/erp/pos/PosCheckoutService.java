@@ -47,6 +47,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.List;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.concurrent.ThreadLocalRandom;
@@ -107,14 +108,28 @@ public class PosCheckoutService {
      * An imported sale carries its own invoice number and its real (past) date, and is not announced
      * one notification per row.
      */
-    public record SaleContext(String saleNumber, LocalDate date, boolean announce) {
+    public record SaleContext(String saleNumber, LocalDate date, boolean announce, StockSource stockSource) {
         public static SaleContext live() {
-            return new SaleContext(null, LocalDate.now(), true);
+            return new SaleContext(null, LocalDate.now(), true, null);
         }
 
         public static SaleContext imported(String saleNumber, LocalDate date) {
-            return new SaleContext(saleNumber, date, false);
+            return new SaleContext(saleNumber, date, false, null);
         }
+
+        /** A sale made from stock that already left the warehouse (see warehouse.WarehouseSettlementService). */
+        public static SaleContext fromIssuedStock(LocalDate date, StockSource source) {
+            return new SaleContext(null, date, true, source);
+        }
+    }
+
+    /**
+     * Where a sale line's stock comes from when it must NOT be taken out of the shelves again: the units were already
+     * taken out when the warehouse gave them out, so the sale just claims them (and their real batch costs).
+     */
+    @FunctionalInterface
+    public interface StockSource {
+        List<com.company.erp.batch.BatchConsumption> take(Product product, int quantity);
     }
 
     @Transactional
@@ -182,7 +197,9 @@ public class PosCheckoutService {
             subtotal = subtotal.add(lineTotal);
 
             // Optional: the cashier can pick the specific batch being sold. Otherwise FIFO.
-            var consumptions = itemRequest.batchId() != null
+            var consumptions = context.stockSource() != null
+                    ? context.stockSource().take(product, itemRequest.quantity())
+                    : itemRequest.batchId() != null
                     ? stockMutationService.issueFromBatch(
                             product, branch, itemRequest.batchId(), itemRequest.quantity(), StockMovementType.SALE,
                             "POS sale " + sale.getSaleNumber(), cashier, StockReferenceType.SALE, sale.getId())
